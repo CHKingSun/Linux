@@ -1,6 +1,10 @@
 #include <iostream>
 
+#include "type.h"
+
+//Cout(char* );
+
 int main() {
-    std::cout << "Hello, World!" << std::endl;
+    std::cout << sizeof(super_block)<< std::endl;
     return 0;
 }
