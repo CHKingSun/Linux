@@ -6,6 +6,7 @@
 #define LINUX_TYPE_H
 
 #include <fstream>
+#include <cmath>
 #include <vector>
 #include <cstring>
 
@@ -25,12 +26,12 @@ const int MAX_INODE_NUM = 1 << 14;
 const int MAX_FILE_SIZE = 1 << 16;
 
 struct inode{ //80
-    Ushort attrib;
+    Ushort attrib, id;
     Uint user_id, group_id;
     Uint block_addr[13]; //直接块 10 | 一级块 256 | 二级块 256*256=65536
     Ulong file_size; //n_blocks = file_size / BLOCK_SIZE;
     Uint n_blocks;
-    time_t c_time, m_time;
+    time_t c_time, a_time;
 //    Uchar not_use[44];
 };
 
@@ -43,24 +44,35 @@ struct file{
     Ushort inode_id;
 };
 
-struct super_block{ //1325580 1295blocks
-    inode inode_table[MAX_INODE_NUM]; //1280 blocks
-    Uchar inode_bitmap[MAX_INODE_NUM/BYTE]; //2 blocks
-    Uchar bitmap[BLOCK_NUM/BYTE]; //12.5 blocks
+struct super_block{ //1 block
     Uint n_free_blocks;
     Uint n_free_inodes;
-    Uint first_block;
+    Uint offset_bitmap; //sizeof(super_block)
+    Uint offset_inode_bitmap; //sizeof(super_block) + sizeof(bitmap)
+    Uint offset_inode; //sizeof(super_block) + sizeof(bitmap) + sizeof(inode_bitmap)
+    Uint offset_block;
 };
 
 struct dentry{
+    dentry(){}
+    dentry(dentry *p): parent(p){
+        cur_dir = new file;
+        cur_node = new inode;
+    }
     dentry *parent;
     file *cur_dir;
-    std::vector<file*> sub_dir;
+    inode *cur_node;
+    std::vector<dentry*> sub_dir;
 };
 
+//inode inode_table[MAX_INODE_NUM]; //sizeof(inode) * MAX_INODE_NUM blocks
+Uchar inode_bitmap[MAX_INODE_NUM/BYTE]; //2 blocks
+Uchar bitmap[BLOCK_NUM/BYTE]; //13 blocks
+
 std::fstream disk;
-super_block block_msg;
-dentry *cur_den;
+super_block *block_msg = NULL;
+dentry *root_den = NULL;
+dentry *cur_den = NULL;
 const char file_sys_name[] = "os.bin";
 
 #endif //LINUX_TYPE_H
