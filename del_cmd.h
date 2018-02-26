@@ -7,20 +7,230 @@
 
 #include <string>
 #include <iostream>
+#include <sstream>
 
 #include "function.h"
+#include "del_file.h"
 
 using namespace std;
 
-void del_cmd(){
-    string cmd;
-    while (cin>>cmd){
-        if(cmd == "exit"){
-            _Cout("ç³»ç»Ÿå·²é€€å‡º......");
-            break;
-        } else if(cmd == "info"){
+void get_info(){
+    //TODO »ñÈ¡ÏµÍ³ĞÅÏ¢ ÎŞ²Î
+    _Cout("´ÅÅÌĞÅÏ¢£º");
+    _Cout(string("\t´ÅÅÌ´óĞ¡£º") + to_string(BLOCK_NUM) + "KB");
+    _Cout(string("\tÒÑÓÃ¿Õ¼ä£º") + to_string(BLOCK_NUM - block_msg->n_free_blocks) + "KB");
+    _Cout(string("\tÊ£Óà¿Õ¼ä£º") + to_string(block_msg->n_free_blocks) + "KB");
+    _Cout(string("\tÊ£Óà¿Õ¼äÕ¼±È£º") + to_string((double)block_msg->n_free_blocks/BLOCK_NUM) + "%");
+    _Cout("ÏêÏ¸ĞÅÏ¢£º");
+    _Cout(string("\t¿é´óĞ¡£º") + to_string(BLOCK_SIZE) + "×Ö½Ú");
+    _Cout(string("\t¿é¸öÊı£º") + to_string(BLOCK_NUM));
+    _Cout(string("\tÊ£Óà¿é¸öÊı£º") + to_string(block_msg->n_free_blocks));
+    _Cout(string("\ti½Úµã×ÜÊı£º") + to_string(MAX_INODE_NUM));
+    _Cout(string("\tÊ£Óài½Úµã¸öÊı£º") + to_string(block_msg->n_free_inodes));
+}
 
-        } else if(cmd == "");
+void get_help(){
+    //TODO »ñÈ¡Ö¸ÁîĞÅÏ¢
+}
+
+bool change_dir(const string &path){
+    //TODO dentry, ./ ../, ÒÔ/×÷Îª·Ö¸ô£¬×¢Òâ²»´æÔÚÇé¿ö 1²Î
+    dentry *den = NULL;
+    if(!get_dir(path, den)){
+        _Cout("ÎŞ·¨¸Ä±äÄ¿Â¼£ºÕÒ²»µ½Ö¸¶¨Â·¾¶¡£");
+        return false;
+    }
+    if((den->cur_node->attrib & (1<<12)) == 0){
+        _Cout("ÎŞ·¨¸Ä±äÄ¿Â¼£º¸ÃÂ·¾¶²»ÊÇÄ¿Â¼¡£");
+        return false;
+    }
+    cur_den = den;
+    den = NULL;
+    return true;
+}
+
+void read_dir(const string &path, bool flag = false){
+    //TODO dentry, 1²Î »ò /s + 1²Î
+    dentry *den = NULL;
+    if(!get_dir(path, den)){
+        _Cout("ÎŞ·¨¶ÁÈ¡Ä¿Â¼£ºÕÒ²»µ½Ö¸¶¨Â·¾¶¡£");
+        return;
+    }
+    if((den->cur_node->attrib & (1<<12)) == 0){
+        _Cout("ÎŞ·¨¶ÁÈ¡Ä¿Â¼£º¸ÃÂ·¾¶²»ÊÇÄ¿Â¼¡£");
+        return;
+    }
+    _Cout("ÎÄ¼ş/Ä¿Â¼Ãû\tÀàĞÍ\t´óĞ¡(KB)\tÈ¨ÏŞ\tËùÊôÓÃ»§\t´´½¨Ê±¼ä");
+    for(auto it : den->sub_dir){
+        _Cout(string(it->cur_dir->file_name) + "\t", false);
+        if((it->cur_node->attrib & (1<<12)) == 0) _Cout("ÎÄ¼ş\t", false);
+        else _Cout("Ä¿Â¼\t", false);
+        _Cout(to_string(it->cur_node->n_blocks) + "\t", false);
+        char rwx[5];
+        sprintf(rwx, "%X", it->cur_node->attrib);
+        _Cout(string(rwx).substr(1) + "\t", false);
+        _Cout(to_string(it->cur_node->user_id) + "\t", false); //¿ÉÄÜĞèÒªĞŞ¸Ä
+        _Cout(string(ctime(&(it->cur_node->c_time))), false);
+    }
+}
+
+void new_dir(string path){
+    //TODO ÎŞ/ / ./ ../ 1²Î ÅĞ¶Ï´æÔÚ
+    //ÒÑ¾­´æÔÚµÄ²»Òª
+    if(path.empty()){ //ÒòÎªsstreamËùÒÔ²»´æÔÚ¿Õ¸ñ×Ö·û´®µÄÇé¿ö
+        _Cout("ÎŞ·¨´´½¨Ä¿Â¼£ºÄ¿Â¼ÃüÃû²»ÕıÈ·¡£");
+        return;
+    }
+    int pos = path.find_last_of('/');
+    string dir_name = path.substr(pos+1);
+    if(dir_name.empty()){
+        _Cout("ÎŞ·¨´´½¨Ä¿Â¼£ºÄ¿Â¼ÃüÃû²»ÕıÈ·¡£");
+        return;
+    }
+    dentry *parent = NULL;
+    if(pos != string::npos){ //·ÖÎª /a(pos = 0), a(pos = npos), /.../a(pos > 0)Çé¿ö
+        if(!get_dir(path.substr(0, pos+1), parent)){
+            _Cout("ÎŞ·¨´´½¨Ä¿Â¼£ºÕÒ²»µ½Â·¾¶¡£");
+            return;
+        }
+    } else {
+        parent = cur_den;
+    }
+    if(parent->cur_node->file_size / BLOCK_SIZE >= 10){
+        _Cout("ÎŞ·¨´´½¨Ä¿Â¼£ºÎÄ¼ş¸öÊıÒÔ´ïµ½×î´ó¡£");
+        return;
+    }
+    for(auto it : parent->sub_dir){
+        if(dir_name == it->cur_dir->file_name) {
+            _Cout("ÎŞ·¨´´½¨Ä¿Â¼£ºÄ¿Â¼ÒÑ´æÔÚ¡£");
+            return;
+        }
+    }
+    auto *den = new dentry(parent);
+    strcpy(den->cur_dir->file_name, dir_name.data());
+    alloc_inode(den->cur_dir->inode_id);
+    den->cur_node->id = den->cur_dir->inode_id;
+    set_attrib(den->cur_node, 1, 7, 5, 5);
+    den->cur_node->c_time = time(0);
+    den->cur_node->a_time = den->cur_node->c_time;
+    den->cur_node->file_size = 0;
+    den->cur_node->n_blocks = 0;
+    write_to_disk(block_msg->offset_inode+den->cur_node->id * sizeof(inode), *(den->cur_node)); //±£´æĞÂµÄi½Úµã
+    parent->sub_dir.push_back(den);
+    add_dir_msg(parent->cur_node, den->cur_dir);
+    write_to_disk(block_msg->offset_inode+parent->cur_node->id * sizeof(inode), *(parent->cur_node)); //¸üĞÂ¸¸i½Úµã
+}
+
+void del_dir(string path){
+    //TODO ×¢Òâ/ 1²Î
+    if(path.empty()){
+        _Cout("ÎŞ·¨É¾³ıÄ¿Â¼£ºÂ·¾¶²»ÕıÈ·¡£");
+        return;
+    }
+    dentry *den = NULL;
+    if(!get_dir(path, den)){
+        _Cout("ÎŞ·¨É¾³ıÄ¿Â¼£ºÂ·¾¶²»ÕıÈ·¡£");
+        return;
+    }
+    //¸ùÄ¿Â¼
+    if(den == root_den){
+        _Cout("ÎŞ·¨É¾³ıÄ¿Â¼£º¸ùÄ¿Â¼ÎŞ·¨É¾³ı");
+        return;
+    }
+    //ÎÄ¼ş
+    if((den->cur_node->attrib & (1<<12)) == 0){
+        _Cout("ÎŞ·¨É¾³ıÄ¿Â¼£º¸ÃÂ·¾¶²»ÊÇÄ¿Â¼¡£");
+        return;
+    }
+    //²»Îª¿ÕÄ¿Â¼
+    if(den->cur_node->file_size != 0){
+        _Cout("¸ÃÄ¿Â¼²»Îª¿Õ£¬ÊÇ·ñÉ¾³ı£¿(Y/N): ", false);
+        if(!check()){
+            _Cout("ÒÑÈ¡ÏûÉ¾³ı¡£");
+            return;
+        }
+    }
+    _Cout("É¾³ıÖĞ£¬ÇëÉÔºó...");
+    if(!remove_dir(den)) _Cout("É¾³ıÊ§°Ü£¡");
+    else _Cout("É¾³ı³É¹¦£¡");
+}
+
+void new_file(string path){
+    //TODO Í¬new_dir 1²Î
+}
+
+void read_file(string path){
+    //TODO ÀàËÆread_dir, ×¢Òâ²»Òª¶Ádir 1²Î
+}
+
+void copy_file(string des, string src){
+    //TODO ×¢Òâ<host> 2²Î
+}
+
+void del_file(string path){
+    //TODO ÀàËÆdel_dir 1²Î
+}
+
+void check_sys(){
+    //TODO ´ı¶¨ ÎŞ²Î
+}
+
+void del_cmd(){
+    string line;
+	string cur_path = "/# ";
+    _Cout(cur_path, false);
+    while (getline(cin, line)){
+        stringstream sin(line);
+        string cmd;
+        sin>>cmd;
+        if(cmd == "exit"){
+            _Cout("ÏµÍ³ÒÑÍË³ö......");
+            break;
+        } else if(cmd == "help"){
+            get_help();
+        } else if(cmd == "info"){
+            get_info();
+        } else if(cmd == "cd"){
+            string path;
+            sin>>path;
+            if(change_dir(path)){
+                if(cur_den == root_den) cur_path = "/# ";
+                else cur_path = cur_den->cur_path.substr(2) + "/" + cur_den->cur_dir->file_name + "# ";
+            }
+        } else if(cmd == "dir"){
+            string path;
+            sin>>path;
+            read_dir(path);
+        } else if(cmd == "md"){
+            string path;
+            sin>>path;
+            new_dir(path);
+        } else if(cmd == "rd"){
+            string path;
+            sin>>path;
+            del_dir(path);
+        } else if(cmd == "newfile"){
+            string path;
+            sin>>path;
+            new_file(path);
+        } else if(cmd == "cat"){
+            string path;
+            sin>>path;
+            read_file(path);
+        } else if(cmd == "copy"){
+            string des, src;
+            sin>>des>>src;
+            copy_file(des, src);
+        } else if(cmd == "del"){
+            string path;
+            sin>>path;
+            del_file(path);
+        } else if(cmd == "check"){
+            check_sys();
+        } else{
+            _Cout("´íÎóÖ¸Áî£¡ÊäÈë'help'»ñÈ¡Ö¸ÁîĞÅÏ¢¡£");
+        }
+        _Cout(cur_path, false);
     }
 }
 

@@ -2,15 +2,18 @@
 // Created by KingSun on 2018/2/24.
 //
 
+//Ö»ÓĞÔÚ¶ÁÈ¡¡¢ĞÂ½¨²Ù×÷Ê±²ÅÓĞnew²Ù×÷
+
 #ifndef LINUX_DEL_FILE_H
 #define LINUX_DEL_FILE_H
 
 #include <vector>
+#include <ctime>
 #include "type.h"
 #include "function.h"
 
 template <class T>
-void read_from_disk(int offset, T &tmp){ //è®°å¾—ä¼ å…¥å®ä¾‹, ä¼ å…¥å‰è®°å¾—åˆå§‹åŒ–tmp
+void read_from_disk(int offset, T &tmp){ //¼ÇµÃ´«ÈëÊµÀı, ´«ÈëÇ°¼ÇµÃ³õÊ¼»¯tmp
     disk.seekg(offset, ios::beg);
     disk.read((char*)&tmp, sizeof(tmp));
 }
@@ -19,29 +22,30 @@ template <class T>
 void write_to_disk(int offset, T &tmp){
     disk.seekp(offset, ios::beg);
     disk.write((char*)&tmp, sizeof(tmp));
+    disk.flush();
 }
 
 Uint *get_blocks(inode *node){
     int n_blocks = 0;
     auto *blocks = new Uint[node->n_blocks];
-    for(int i = 0; i < 10; ++i){ //ç›´æ¥å—
+    for(int i = 0; i < 10; ++i){ //Ö±½Ó¿é
         blocks[n_blocks] = node->block_addr[i];
         if((++n_blocks) == node->n_blocks) return blocks;
     }
-    disk.seekg(block_msg->offset_block + node->block_addr[10]*BLOCK_SIZE, ios::beg);
+    disk.seekg(node->block_addr[10]*BLOCK_SIZE, ios::beg);
     int block_num = BLOCK_SIZE / sizeof(Uint);
-    for(int i = 0; i < block_num; ++i){ //ä¸€çº§å—
+    for(int i = 0; i < block_num; ++i){ //Ò»¼¶¿é
         disk.read((char*)&blocks[n_blocks], sizeof(Uint));
         if((++n_blocks) == node->n_blocks) return blocks;
     }
-    disk.seekg(block_msg->offset_block + node->block_addr[11]*BLOCK_SIZE, ios::beg);
+    disk.seekg(node->block_addr[11]*BLOCK_SIZE, ios::beg);
     int remain_num = (node->n_blocks - n_blocks - 1) / block_num + 1;
     auto *remain = new Uint[remain_num];
-    for(int i = 0; i < remain_num; ++i){ //äºŒçº§å—å¯¹åº”çš„åœ°å€å—
+    for(int i = 0; i < remain_num; ++i){ //¶ş¼¶¿é¶ÔÓ¦µÄµØÖ·¿é
         disk.read((char*)&remain[i], sizeof(Uint));
     }
-    for(int i = 0; i < remain_num; ++i){ //äºŒçº§å—
-        disk.seekg(block_msg->offset_block + remain[i]*BLOCK_SIZE, ios::beg);
+    for(int i = 0; i < remain_num; ++i){ //¶ş¼¶¿é
+        disk.seekg(remain[i]*BLOCK_SIZE, ios::beg);
         for(int j = 0; j < block_num; ++j){
             disk.read((char*)&blocks[n_blocks], sizeof(Uint));
             if((++n_blocks) == node->n_blocks) return blocks;
@@ -49,7 +53,7 @@ Uint *get_blocks(inode *node){
     }
 }
 
-bool get_sub_dir(dentry *&den){ //ç›®å½•æœ€å¤šéœ€è¦2048ä¸ªå—
+bool get_sub_dir(dentry *&den){ //Ä¿Â¼×î¶àĞèÒª2048¸ö¿é
     if((den->cur_node->attrib & (1<<12)) == 0){
         _Cout("This is not a directory.");
         return false;
@@ -59,10 +63,11 @@ bool get_sub_dir(dentry *&den){ //ç›®å½•æœ€å¤šéœ€è¦2048ä¸ªå—
     Uint *blocks = get_blocks(den->cur_node);
     int file_num = BLOCK_SIZE / sizeof(file);
     for(int i = 0; i < den->cur_node->n_blocks; ++i){
-        disk.seekg(block_msg->offset_block+blocks[i]*BLOCK_SIZE, ios::beg);
+//        disk.seekg(blocks[i]*BLOCK_SIZE, ios::beg);
         for(int j = 0; j < file_num; ++j){
             auto tmp = new dentry(den);
-            disk.read((char*)tmp->cur_dir, sizeof(file));
+//            disk.read((char*)tmp->cur_dir, sizeof(file));
+            read_from_disk(blocks[i]*BLOCK_SIZE+j*sizeof(file), *(tmp->cur_dir));
             read_from_disk(block_msg->offset_inode+tmp->cur_dir->inode_id*sizeof(inode), *(tmp->cur_node));
             den->sub_dir.push_back(tmp);
             file_size -= sizeof(file);
@@ -76,15 +81,100 @@ bool alloc_inode(Ushort &id){
     if(block_msg->n_free_inodes == 0) return false;
     id = 0;
     for (Uchar &map : inode_bitmap) {
-        for(int j = 0; j < BYTE; ++j){
+        for(char j = 0; j < BYTE; ++j){
             if((map & (1 << j)) == 0){
-                map = 1 << j;
+                map |= 1 << j;
                 --(block_msg->n_free_inodes);
                 return true;
             }
             ++id;
         }
     }
+    return false;
+}
+
+bool has_dir(const string &dir_name, dentry *parent, dentry *&sub_dir){
+    if(dir_name.empty()){
+        sub_dir = parent;
+        return true;
+    }
+    for(auto it : parent->sub_dir){
+        if(dir_name == it->cur_dir->file_name) {
+            sub_dir = it;
+            if(it->sub_dir.empty()) get_sub_dir(it);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool get_dir(const string &path, dentry *&den){
+    //Ä¿Â¼¿ÉÒÔÎª¿Õ£¬»ñÈ¡µ±Ç°Ä¿Â¼
+	if (path.empty()) {
+		den = cur_den;
+		return true;
+	}
+    vector<string> parts;
+    spilt(path, parts);
+    if(parts[0].empty()){
+        den = root_den;
+    } else if(parts[0] == "."){
+        den = cur_den;
+    } else if(parts[0] == ".."){
+        den = cur_den->parent;
+    } else if(!has_dir(parts[0], cur_den, den)){
+        return false;
+    }
+    for(auto it = parts.begin()+1; it != parts.end(); ++it){
+        if(!has_dir((*it), den, den)){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool alloc_block(Uint &addr){
+    if(block_msg->n_free_blocks == 0) return false;
+    addr = block_msg->offset_block / BLOCK_SIZE; //µÚÒ»¸ö¿é
+    for(int i = addr / BYTE; i < BLOCK_NUM / BYTE; ++i){
+        for(char j = 0; j < BYTE; ++j){
+            if((bitmap[i] & (1 << j)) == 0){
+                bitmap[i] |= 1 << j;
+                --(block_msg->n_free_blocks);
+                return true;
+            }
+            ++addr;
+        }
+    }
+    return false;
+}
+
+bool add_dir_msg(inode *&node, file *dir){
+    if((node->attrib & (1<<12)) == 0){
+        _Cout("This is not a directory.");
+        return false;
+    }
+    if(node->file_size / BLOCK_SIZE >= 10){
+        _Cout("files num over.");
+        return false;
+    }
+    if(node->file_size % BLOCK_SIZE == 0){ //¿é¸Õ¸ÕºÃ·ÅÂú
+        alloc_block(node->block_addr[node->file_size/BLOCK_SIZE]);
+        ++(node->n_blocks);
+    }
+    write_to_disk(node->block_addr[node->file_size/BLOCK_SIZE] * BLOCK_SIZE
+                  + node->file_size%BLOCK_SIZE, *dir);
+    node->file_size += sizeof(file);
+    node->a_time = time(0);
+    return true;
+}
+
+bool remove_file(dentry *den){
+
+}
+
+bool remove_dir(dentry *den){
+
 }
 
 #endif //LINUX_DEL_FILE_H

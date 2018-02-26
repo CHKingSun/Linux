@@ -15,32 +15,6 @@
 #include "del_file.h"
 #include "debug.h"
 
-bool check(){
-    char ch = getchar();
-    if(ch == 27){
-        _Cout("\n输入已取消。");
-        return false;
-    } else if(ch == 'Y' || ch == 'y'){
-        ch = getchar();
-        if(ch == '\n') return true;
-        else if(ch == 'E' || ch == 'e'){
-            ch = getchar();
-            if(ch == 'S' || ch == 's'){
-                if(getchar() == '\n') return true;
-            }
-        }
-    } else if(ch == 'N' || ch == 'n'){
-        ch = getchar();
-        if(ch == '\n') return false;
-        else if(ch == 'O' || ch == 'o'){
-            if(getchar() == '\n') return false;
-        }
-    }
-    while (getchar() != '\n');
-    _Cout("命令不正确，请输入(Y/N)或者按ESC取消输入: ", false);
-    return check();
-}
-
 void save_disk(){
     write_to_disk(0, *block_msg);
     write_to_disk(block_msg->offset_bitmap, bitmap);
@@ -83,11 +57,11 @@ void init_disk(){
     block_msg = NULL;
     disk.close();
     _Cout("初始化完成！");
-    disk.open(file_sys_name, ios::out | ios::in | ios::binary);
 }
 
 bool load_disk(){
     _Cout("系统加载中，请稍后......");
+    disk.open(file_sys_name, ios::in | ios::out | ios::binary);
     block_msg = new super_block;
     read_from_disk(0, *block_msg);
     read_from_disk(block_msg->offset_bitmap, bitmap);
@@ -121,6 +95,7 @@ bool initial(){
             init_disk();
         }
     }
+    disk.close();
     return load_disk();
 }
 
@@ -131,8 +106,6 @@ void sys_exit(){
     block_msg = NULL;
     delete root_den;
     root_den = NULL;
-    delete cur_den;
-    cur_den = NULL;
     disk.close();
 }
 

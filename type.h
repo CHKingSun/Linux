@@ -28,7 +28,7 @@ const int MAX_FILE_SIZE = 1 << 16;
 struct inode{ //80
     Ushort attrib, id;
     Uint user_id, group_id;
-    Uint block_addr[13]; //ç›´æŽ¥å— 10 | ä¸€çº§å— 256 | äºŒçº§å— 256*256=65536
+    Uint block_addr[13]; //Ö±½Ó¿é 10 | Ò»¼¶¿é 256 | ¶þ¼¶¿é 256*256=65536
     Ulong file_size; //n_blocks = file_size / BLOCK_SIZE;
     Uint n_blocks;
     time_t c_time, a_time;
@@ -58,9 +58,16 @@ struct dentry{
     dentry(dentry *p): parent(p){
         cur_dir = new file;
         cur_node = new inode;
+        cur_path = parent->cur_path + "/" + parent->cur_dir->file_name;
+    }
+    ~dentry(){
+        delete(cur_dir);
+        delete(cur_node);
+        sub_dir.erase(sub_dir.begin(), sub_dir.end());
     }
     dentry *parent;
     file *cur_dir;
+    string cur_path;
     inode *cur_node;
     std::vector<dentry*> sub_dir;
 };
