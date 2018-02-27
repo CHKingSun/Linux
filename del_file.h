@@ -169,12 +169,47 @@ bool add_dir_msg(inode *&node, file *dir){
     return true;
 }
 
-bool remove_file(dentry *den){
+void remove_file(dentry *den){
 
 }
 
-bool remove_dir(dentry *den){
+void remove_dir_msg(dentry *&parent, dentry *&den){
+    Ulong file_size = 0;
+	vector<dentry*>::iterator del_it;
+    for(auto it = parent->sub_dir.begin(); it != parent->sub_dir.end(); ++it){
+        if((*it) == den){
+			del_it = it;
+            continue;
+        }
+        write_to_disk(parent->cur_node->block_addr[parent->cur_node->file_size/BLOCK_SIZE]*BLOCK_SIZE +
+                              parent->cur_node->file_size%BLOCK_SIZE, *((*it)->cur_dir));
+        file_size += sizeof(file);
+    }
+	parent->sub_dir.erase(del_it);
+    if(file_size % BLOCK_SIZE == 0){
+        --(parent->cur_node->n_blocks);
+        set_bitmap(parent->cur_node->block_addr[file_size % BLOCK_SIZE], false);
+    }
+    parent->cur_node->file_size = file_size;
+    parent->cur_node->a_time = time(0);
+}
 
+void remove_dir(dentry *&den){
+    if(den->sub_dir.empty()) get_sub_dir(den);
+//    for (auto &it : den->sub_dir) {
+//        if((it->cur_node->attrib & (1<<12)) == 0) remove_file(it);
+//        else remove_dir(it);
+//    }
+    while(!den->sub_dir.empty()){
+        if((den->sub_dir[den->sub_dir.size()-1]->cur_node->attrib & (1<<12)) == 0) remove_file(den->sub_dir[den->sub_dir.size()-1]);
+        else remove_dir(den->sub_dir[den->sub_dir.size()-1]);
+    }
+    if(den == cur_den) cur_den = den->parent;
+    set_inode_bitmap(den->cur_node->id, false);
+    remove_dir_msg(den->parent, den);
+    write_to_disk(block_msg->offset_inode+den->parent->cur_node->id * sizeof(inode), *(den->parent->cur_node)); //更新父i节点
+    delete den;
+	den = NULL;
 }
 
 #endif //LINUX_DEL_FILE_H

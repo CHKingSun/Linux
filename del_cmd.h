@@ -151,8 +151,8 @@ void del_dir(string path){
         }
     }
     _Cout("删除中，请稍后...");
-    if(!remove_dir(den)) _Cout("删除失败！");
-    else _Cout("删除成功！");
+    remove_dir(den);
+    _Cout("删除成功！");
 }
 
 void new_file(string path){

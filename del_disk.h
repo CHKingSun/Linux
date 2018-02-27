@@ -35,7 +35,7 @@ void init_disk(){
     block_msg->offset_inode = block_msg->offset_inode_bitmap + ceil((float)sizeof(inode_bitmap) / BLOCK_SIZE) * BLOCK_SIZE;
     block_msg->offset_block = block_msg->offset_inode + sizeof(inode) * MAX_INODE_NUM;
     block_msg->n_free_inodes = MAX_INODE_NUM;
-    block_msg->n_free_blocks = BLOCK_NUM - block_msg->offset_block / BLOCK_SIZE;
+    block_msg->n_free_blocks = BLOCK_NUM;
     for(int i = 0; i < block_msg->offset_block / BLOCK_SIZE; ++i) set_bitmap(i);
     auto *root_dir = new inode;
     alloc_inode(root_dir->id);
@@ -48,7 +48,6 @@ void init_disk(){
     write_to_disk(block_msg->offset_inode+root_dir->id * sizeof(inode), *root_dir); //要注意偏移的数据是什么
 //    print(root_dir);
 //    print(block_msg);
-    set_inode_bitmap(0);
     save_disk();
 	//exit(0);
     delete root_dir;
