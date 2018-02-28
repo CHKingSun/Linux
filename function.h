@@ -13,6 +13,7 @@
 void _Cout(string msg, bool warp = true){
     std::cout<<msg;
     if(warp) std::cout<<std::endl;
+    else std::cout<<std::flush;
 }
 
 char _getchar(bool print = true){
@@ -22,7 +23,10 @@ char _getchar(bool print = true){
         _Cout("\b \b", false);
         return _getchar();
     }
-    if(print) _Cout(ch, false);
+    if(print) {
+        if(ch[0] == '\r') _Cout("");
+        else _Cout(ch, false);
+    }
     else _Cout("*", false);
     return ch[0];
 }
