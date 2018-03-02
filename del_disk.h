@@ -36,7 +36,7 @@ void init_disk(){
     block_msg->offset_block = block_msg->offset_inode + sizeof(inode) * MAX_INODE_NUM;
     block_msg->n_free_inodes = MAX_INODE_NUM;
     block_msg->n_free_blocks = BLOCK_NUM;
-    for(int i = 0; i < block_msg->offset_block / BLOCK_SIZE; ++i) set_bitmap(i);
+    for(int i = 0; i < block_msg->offset_block / BLOCK_SIZE; ++i) set_bitmap(i); //将固定信息区域的块设为已用
     auto *root_dir = new inode;
     alloc_inode(root_dir->id);
     root_dir->c_time = time(0);

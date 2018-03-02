@@ -267,6 +267,7 @@ void copy_file(const string &src, string des){
         den->cur_node->n_blocks = n_blocks;
         den->cur_node->file_size = file_size;
         copy_file(fin, den->cur_node);
+        fin.close()
     } else{
         int pos = src.find_last_of('/', -1);
         if(pos == src.size()-1){
